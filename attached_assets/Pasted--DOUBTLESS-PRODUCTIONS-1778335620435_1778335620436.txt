@@ -1,0 +1,901 @@
+/***********************************************************************
+ *
+ * DOUBTLESS PRODUCTIONS CRM PLATFORM CORE
+ * MONOLITH STARTER FILE
+ *
+ * Includes:
+ * 1. Microsoft OAuth (multi-user)
+ * 2. Token refresh
+ * 3. Signed URLs
+ * 4. Event bus
+ * 5. Automations
+ * 6. Pipelines
+ * 7. Client portals
+ * 8. Media versioning
+ * 9. Content engine
+ * 10. Advanced permissions
+ * 11. Audit logs
+ * 12. Subscriptions
+ * 13. Realtime sockets
+ * 14. Notion-like page builder
+ * 15. Analytics engine
+ *
+ ***********************************************************************/
+
+import Fastify from "fastify";
+import jwt from "@fastify/jwt";
+import websocket from "@fastify/websocket";
+import cors from "@fastify/cors";
+
+import pg from "pg";
+import axios from "axios";
+import cron from "node-cron";
+
+import { Queue, Worker } from "bullmq";
+import IORedis from "ioredis";
+
+import {
+  S3Client,
+  GetObjectCommand
+} from "@aws-sdk/client-s3";
+
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+
+import { Server } from "socket.io";
+import http from "http";
+
+/***********************************************************************
+ *
+ * ENV
+ *
+ ***********************************************************************/
+
+const {
+  DATABASE_URL,
+  JWT_SECRET,
+
+  MICROSOFT_CLIENT_ID,
+  MICROSOFT_CLIENT_SECRET,
+  MICROSOFT_REDIRECT_URI,
+
+  REDIS_URL,
+
+  S3_ENDPOINT,
+  S3_KEY,
+  S3_SECRET,
+  S3_BUCKET
+} = process.env;
+
+/***********************************************************************
+ *
+ * APP SETUP
+ *
+ ***********************************************************************/
+
+const app = Fastify({
+  logger: true
+});
+
+await app.register(cors, {
+  origin: true,
+  credentials: true
+});
+
+await app.register(jwt, {
+  secret: JWT_SECRET!
+});
+
+await app.register(websocket);
+
+/***********************************************************************
+ *
+ * DATABASE
+ *
+ ***********************************************************************/
+
+const db = new pg.Pool({
+  connectionString: DATABASE_URL
+});
+
+(app as any).db = db;
+
+/***********************************************************************
+ *
+ * REDIS + QUEUES
+ *
+ ***********************************************************************/
+
+const redis = new IORedis(REDIS_URL!);
+
+const eventQueue = new Queue("events", {
+  connection: redis
+});
+
+/***********************************************************************
+ *
+ * S3
+ *
+ ***********************************************************************/
+
+const s3 = new S3Client({
+  region: "auto",
+  endpoint: S3_ENDPOINT,
+  credentials: {
+    accessKeyId: S3_KEY!,
+    secretAccessKey: S3_SECRET!
+  }
+});
+
+/***********************************************************************
+ *
+ * SOCKET SERVER
+ *
+ ***********************************************************************/
+
+const server = http.createServer(app.server);
+
+const io = new Server(server, {
+  cors: {
+    origin: "*"
+  }
+});
+
+io.use(async (socket: any, next) => {
+  try {
+    const token = socket.handshake.auth.token;
+
+    const decoded = app.jwt.verify(token);
+
+    socket.user = decoded;
+
+    next();
+  } catch {
+    next(new Error("Unauthorized"));
+  }
+});
+
+io.on("connection", (socket: any) => {
+  socket.join(`user:${socket.user.id}`);
+
+  app.log.info(`Socket connected ${socket.user.id}`);
+
+  socket.on("disconnect", () => {
+    app.log.info(`Socket disconnected ${socket.user.id}`);
+  });
+});
+
+/***********************************************************************
+ *
+ * HELPERS
+ *
+ ***********************************************************************/
+
+async function auditLog(data: {
+  userId: number;
+  action: string;
+  entityType?: string;
+  entityId?: number;
+  metadata?: any;
+}) {
+  await db.query(
+    `
+    INSERT INTO audit_logs (
+      user_id,
+      action,
+      entity_type,
+      entity_id,
+      metadata
+    )
+    VALUES ($1,$2,$3,$4,$5)
+    `,
+    [
+      data.userId,
+      data.action,
+      data.entityType,
+      data.entityId,
+      data.metadata || {}
+    ]
+  );
+}
+
+async function generateSignedStorageUrl(
+  storageKey: string
+) {
+  const command = new GetObjectCommand({
+    Bucket: S3_BUCKET!,
+    Key: storageKey
+  });
+
+  return getSignedUrl(s3, command, {
+    expiresIn: 60
+  });
+}
+
+async function checkFileAccess(
+  userId: number,
+  projectId: number
+) {
+  const result = await db.query(
+    `
+    SELECT 1
+    FROM project_members
+    WHERE user_id = $1
+    AND project_id = $2
+    `,
+    [userId, projectId]
+  );
+
+  return result.rows.length > 0;
+}
+
+/***********************************************************************
+ *
+ * MICROSOFT TOKEN SERVICE
+ *
+ ***********************************************************************/
+
+async function getMicrosoftAccessToken(
+  userId: number
+) {
+  const result = await db.query(
+    `
+    SELECT *
+    FROM microsoft_accounts
+    WHERE user_id = $1
+    `,
+    [userId]
+  );
+
+  const account = result.rows[0];
+
+  if (!account) {
+    throw new Error("Microsoft not connected");
+  }
+
+  if (
+    Date.now() <
+    account.expires_at - 60000
+  ) {
+    return account.access_token;
+  }
+
+  const refresh = await axios.post(
+    "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+    new URLSearchParams({
+      client_id: MICROSOFT_CLIENT_ID!,
+      client_secret: MICROSOFT_CLIENT_SECRET!,
+      refresh_token: account.refresh_token,
+      grant_type: "refresh_token"
+    }),
+    {
+      headers: {
+        "Content-Type":
+          "application/x-www-form-urlencoded"
+      }
+    }
+  );
+
+  const data = refresh.data;
+
+  await db.query(
+    `
+    UPDATE microsoft_accounts
+    SET
+      access_token = $1,
+      refresh_token = $2,
+      expires_at = $3
+    WHERE user_id = $4
+    `,
+    [
+      data.access_token,
+      data.refresh_token,
+      Date.now() + data.expires_in * 1000,
+      userId
+    ]
+  );
+
+  return data.access_token;
+}
+
+/***********************************************************************
+ *
+ * MICROSOFT AUTH
+ *
+ ***********************************************************************/
+
+app.get(
+  "/api/auth/microsoft",
+  async (req: any, reply) => {
+    const user = await req.jwtVerify();
+
+    const params = new URLSearchParams({
+      client_id: MICROSOFT_CLIENT_ID!,
+      response_type: "code",
+      redirect_uri:
+        MICROSOFT_REDIRECT_URI!,
+      response_mode: "query",
+      scope: [
+        "openid",
+        "offline_access",
+        "User.Read",
+        "Mail.Read",
+        "Mail.Send",
+        "Files.ReadWrite",
+        "Calendars.ReadWrite"
+      ].join(" "),
+      state: String(user.id)
+    });
+
+    reply.redirect(
+      `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params}`
+    );
+  }
+);
+
+app.get(
+  "/api/auth/microsoft/callback",
+  async (req: any, reply) => {
+    const { code, state } =
+      req.query;
+
+    const tokenRes = await axios.post(
+      "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      new URLSearchParams({
+        client_id:
+          MICROSOFT_CLIENT_ID!,
+        client_secret:
+          MICROSOFT_CLIENT_SECRET!,
+        code,
+        redirect_uri:
+          MICROSOFT_REDIRECT_URI!,
+        grant_type:
+          "authorization_code"
+      }),
+      {
+        headers: {
+          "Content-Type":
+            "application/x-www-form-urlencoded"
+        }
+      }
+    );
+
+    const tokens = tokenRes.data;
+
+    const me = await axios.get(
+      "https://graph.microsoft.com/v1.0/me",
+      {
+        headers: {
+          Authorization: `Bearer ${tokens.access_token}`
+        }
+      }
+    );
+
+    await db.query(
+      `
+      INSERT INTO microsoft_accounts (
+        user_id,
+        microsoft_user_id,
+        email,
+        access_token,
+        refresh_token,
+        expires_at
+      )
+      VALUES ($1,$2,$3,$4,$5,$6)
+      ON CONFLICT (user_id)
+      DO UPDATE SET
+        access_token = EXCLUDED.access_token,
+        refresh_token = EXCLUDED.refresh_token,
+        expires_at = EXCLUDED.expires_at
+      `,
+      [
+        Number(state),
+        me.data.id,
+        me.data.mail ||
+          me.data.userPrincipalName,
+        tokens.access_token,
+        tokens.refresh_token,
+        Date.now() +
+          tokens.expires_in * 1000
+      ]
+    );
+
+    reply.redirect(
+      "/settings/integrations"
+    );
+  }
+);
+
+/***********************************************************************
+ *
+ * SIGNED URL ROUTE
+ *
+ ***********************************************************************/
+
+app.get(
+  "/api/storage/signed-url/:id",
+  async (req: any, reply) => {
+    const user = await req.jwtVerify();
+
+    const { id } = req.params;
+
+    const result = await db.query(
+      `
+      SELECT *
+      FROM storage_objects
+      WHERE id = $1
+      `,
+      [id]
+    );
+
+    const file = result.rows[0];
+
+    if (!file) {
+      return reply.code(404).send({
+        error: "File not found"
+      });
+    }
+
+    const allowed =
+      await checkFileAccess(
+        user.id,
+        file.project_id
+      );
+
+    if (!allowed) {
+      return reply.code(403).send({
+        error: "Forbidden"
+      });
+    }
+
+    const url =
+      await generateSignedStorageUrl(
+        file.storage_key
+      );
+
+    return {
+      url
+    };
+  }
+);
+
+/***********************************************************************
+ *
+ * AUTOMATIONS
+ *
+ ***********************************************************************/
+
+async function runAutomations(
+  trigger: string,
+  payload: any
+) {
+  const result = await db.query(
+    `
+    SELECT *
+    FROM automations
+    WHERE trigger = $1
+    AND enabled = true
+    `,
+    [trigger]
+  );
+
+  for (const automation of result.rows) {
+    const actions =
+      automation.actions || [];
+
+    for (const action of actions) {
+      switch (action.type) {
+        case "send_notification":
+          io.to(
+            `user:${payload.userId}`
+          ).emit("notification", {
+            title: action.title,
+            body: action.body
+          });
+          break;
+
+        case "create_task":
+          await db.query(
+            `
+            INSERT INTO tasks (
+              title,
+              user_id
+            )
+            VALUES ($1,$2)
+            `,
+            [
+              action.title,
+              payload.userId
+            ]
+          );
+          break;
+      }
+    }
+  }
+}
+
+/***********************************************************************
+ *
+ * EVENT BUS
+ *
+ ***********************************************************************/
+
+new Worker(
+  "events",
+  async (job) => {
+    switch (job.name) {
+      case "message.created":
+        await runAutomations(
+          "message.created",
+          job.data
+        );
+        break;
+
+      case "invoice.paid":
+        await runAutomations(
+          "invoice.paid",
+          job.data
+        );
+        break;
+    }
+  },
+  {
+    connection: redis
+  }
+);
+
+/***********************************************************************
+ *
+ * PIPELINES
+ *
+ ***********************************************************************/
+
+app.patch(
+  "/api/pipelines/items/:id/stage",
+  async (req: any) => {
+    const { id } = req.params;
+
+    const { stageId } = req.body;
+
+    await db.query(
+      `
+      UPDATE pipeline_items
+      SET stage_id = $1
+      WHERE id = $2
+      `,
+      [stageId, id]
+    );
+
+    return {
+      success: true
+    };
+  }
+);
+
+/***********************************************************************
+ *
+ * CLIENT PORTALS
+ *
+ ***********************************************************************/
+
+app.addHook(
+  "onRequest",
+  async (req: any) => {
+    const host = req.hostname;
+
+    if (
+      host.endsWith(".doubtless.com")
+    ) {
+      req.portalSlug =
+        host.split(".")[0];
+    }
+  }
+);
+
+app.get(
+  "/api/portal",
+  async (req: any) => {
+    const result = await db.query(
+      `
+      SELECT *
+      FROM portal_clients
+      WHERE slug = $1
+      `,
+      [req.portalSlug]
+    );
+
+    return result.rows[0];
+  }
+);
+
+/***********************************************************************
+ *
+ * MEDIA VERSIONING
+ *
+ ***********************************************************************/
+
+app.post(
+  "/api/media/version",
+  async (req: any) => {
+    const user = await req.jwtVerify();
+
+    const {
+      projectId,
+      fileId,
+      versionName,
+      notes
+    } = req.body;
+
+    await db.query(
+      `
+      INSERT INTO media_versions (
+        project_id,
+        file_id,
+        version_name,
+        notes,
+        created_by
+      )
+      VALUES ($1,$2,$3,$4,$5)
+      `,
+      [
+        projectId,
+        fileId,
+        versionName,
+        notes,
+        user.id
+      ]
+    );
+
+    await auditLog({
+      userId: user.id,
+      action:
+        "media.version.created",
+      entityType: "project",
+      entityId: projectId
+    });
+
+    return {
+      success: true
+    };
+  }
+);
+
+/***********************************************************************
+ *
+ * CONTENT ENGINE
+ *
+ ***********************************************************************/
+
+cron.schedule("* * * * *", async () => {
+  const posts = await db.query(
+    `
+    SELECT *
+    FROM content_posts
+    WHERE scheduled_at <= NOW()
+    AND published_at IS NULL
+    `
+  );
+
+  for (const post of posts.rows) {
+    console.log(
+      `Publishing ${post.id}`
+    );
+
+    await db.query(
+      `
+      UPDATE content_posts
+      SET published_at = NOW()
+      WHERE id = $1
+      `,
+      [post.id]
+    );
+  }
+});
+
+/***********************************************************************
+ *
+ * ADVANCED PERMISSIONS
+ *
+ ***********************************************************************/
+
+function requirePermission(
+  permission: string
+) {
+  return async (
+    req: any,
+    reply: any
+  ) => {
+    const user =
+      await req.jwtVerify();
+
+    const result = await db.query(
+      `
+      SELECT 1
+      FROM user_permissions_view
+      WHERE user_id = $1
+      AND permission_key = $2
+      `,
+      [user.id, permission]
+    );
+
+    if (!result.rows.length) {
+      return reply.code(403).send({
+        error: "Forbidden"
+      });
+    }
+  };
+}
+
+/***********************************************************************
+ *
+ * SUBSCRIPTIONS
+ *
+ ***********************************************************************/
+
+async function requirePlan(
+  userId: number,
+  plans: string[]
+) {
+  const result = await db.query(
+    `
+    SELECT *
+    FROM subscriptions
+    WHERE user_id = $1
+    `,
+    [userId]
+  );
+
+  const subscription =
+    result.rows[0];
+
+  if (
+    !subscription ||
+    !plans.includes(
+      subscription.plan
+    )
+  ) {
+    throw new Error(
+      "Upgrade required"
+    );
+  }
+}
+
+/***********************************************************************
+ *
+ * PAGE BUILDER
+ *
+ ***********************************************************************/
+
+app.post(
+  "/api/pages/:id/blocks",
+  async (req: any) => {
+    const { id } = req.params;
+
+    const {
+      type,
+      position,
+      data
+    } = req.body;
+
+    await db.query(
+      `
+      INSERT INTO page_blocks (
+        page_id,
+        type,
+        position,
+        data
+      )
+      VALUES ($1,$2,$3,$4)
+      `,
+      [
+        id,
+        type,
+        position,
+        data
+      ]
+    );
+
+    return {
+      success: true
+    };
+  }
+);
+
+/***********************************************************************
+ *
+ * ANALYTICS
+ *
+ ***********************************************************************/
+
+app.get(
+  "/api/analytics/dashboard",
+  async () => {
+    const result = await db.query(
+      `
+      SELECT
+        COUNT(DISTINCT users.id)
+          AS total_users,
+
+        COUNT(DISTINCT projects.id)
+          AS total_projects
+
+      FROM users
+      LEFT JOIN projects
+      ON true
+      `
+    );
+
+    return result.rows[0];
+  }
+);
+
+/***********************************************************************
+ *
+ * MESSAGES
+ *
+ ***********************************************************************/
+
+app.post(
+  "/api/messages/threads/:id/messages",
+  async (req: any) => {
+    const user =
+      await req.jwtVerify();
+
+    const { id } = req.params;
+
+    const { content } = req.body;
+
+    const result = await db.query(
+      `
+      INSERT INTO messages (
+        thread_id,
+        sender_id,
+        content
+      )
+      VALUES ($1,$2,$3)
+      RETURNING *
+      `,
+      [id, user.id, content]
+    );
+
+    const message =
+      result.rows[0];
+
+    await eventQueue.add(
+      "message.created",
+      {
+        userId: user.id,
+        threadId: id,
+        messageId: message.id
+      }
+    );
+
+    return message;
+  }
+);
+
+/***********************************************************************
+ *
+ * START
+ *
+ ***********************************************************************/
+
+async function start() {
+  try {
+    await app.listen({
+      port: 8080,
+      host: "0.0.0.0"
+    });
+
+    server.listen(3001);
+
+    console.log(
+      "CRM Platform Running"
+    );
+  } catch (err) {
+    app.log.error(err);
+
+    process.exit(1);
+  }
+}
+
+start();

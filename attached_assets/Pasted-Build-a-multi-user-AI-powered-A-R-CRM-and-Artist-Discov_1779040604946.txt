@@ -1,0 +1,233 @@
+Build a multi-user AI-powered A&R CRM and Artist Discovery Operating System.
+
+The platform should allow my entire team to log in and collaboratively manage artist discovery, outreach, lead tracking, and artist relationships.
+
+========================================
+MULTI-USER TEAM SYSTEM
+======================
+
+Features:
+
+* secure team logins
+* role-based permissions
+* admin dashboard
+* team activity tracking
+* shared CRM access
+* assigned leads/tasks
+* internal notes/comments
+* notifications system
+
+Roles:
+
+* Admin
+* A&R
+* Marketing
+* Studio Manager
+* Read-only Viewer
+
+========================================
+ARTIST DISCOVERY ENGINE
+=======================
+
+Continuously search:
+
+* Instagram
+* TikTok
+* Spotify
+* YouTube
+* SoundCloud
+* Bandcamp
+* Twitter/X
+* Reddit
+* local blogs
+* music publications
+
+Search by:
+
+* city
+* state
+* region
+* radius
+* genre
+* hashtags
+* follower size
+* engagement rate
+* growth trends
+* upload consistency
+
+========================================
+AI LEAD ORGANIZATION
+====================
+
+Automatically organize artists into structured folders and databases.
+
+Sort artists by:
+
+* genre
+* city/state
+* follower count
+* engagement level
+* growth velocity
+* booking potential
+* service interest
+* active/inactive
+* hot/warm/cold lead
+* local/regional/national
+
+Create:
+
+* searchable artist profiles
+* tags
+* smart filters
+* saved views
+* dynamic collections
+
+Examples:
+
+* Kansas City Hip-Hop Artists
+* Fast Growing Rock Artists
+* Artists Under 10K Followers
+* High Engagement Local Artists
+* Potential Video Clients
+* Artists Needing Mixing/Mastering
+
+========================================
+CRM SYSTEM
+==========
+
+Each artist profile should include:
+
+* contact info
+* social links
+* streaming links
+* conversation history
+* AI-generated summary
+* notes
+* tasks
+* reminders
+* outreach status
+* project history
+* revenue potential
+
+========================================
+AI ANALYSIS ENGINE
+==================
+
+Generate:
+
+* artist summaries
+* audience analysis
+* branding score
+* growth score
+* professionalism score
+* AI recommendations
+
+Detect:
+
+* rising artists
+* viral momentum
+* collaboration patterns
+* release frequency
+* local scene trends
+
+========================================
+AI OUTREACH SYSTEM
+==================
+
+Generate:
+
+* DMs
+* emails
+* follow-up campaigns
+* booking proposals
+* service recommendations
+
+Features:
+
+* approval before sending
+* team collaboration
+* scheduled outreach
+* response tracking
+
+========================================
+SOCIAL MEDIA CRM
+================
+
+Connect:
+
+* Instagram
+* TikTok
+* Facebook
+* Gmail
+* Outlook
+* Discord
+
+Allow:
+
+* inbox syncing
+* DM tracking
+* unified communications dashboard
+
+========================================
+ANALYTICS DASHBOARD
+===================
+
+Show:
+
+* lead generation metrics
+* artist growth trends
+* conversion rates
+* outreach performance
+* hottest regions
+* top-performing genres
+* team performance
+
+========================================
+TECHNICAL REQUIREMENTS
+======================
+
+Frontend:
+
+* React
+* Tailwind
+* modern SaaS dashboard UI
+
+Backend:
+
+* Node.js
+* PostgreSQL
+* Redis queues
+
+AI:
+
+* OpenAI API
+* vector memory database
+* AI lead scoring
+* AI summaries
+* AI categorization
+
+Infrastructure:
+
+* scalable architecture
+* API-first
+* modular services
+* webhook support
+* cloud storage
+* Replit deployment ready
+
+========================================
+IMPORTANT
+=========
+
+The platform must be built as a scalable operating system, not a basic chatbot.
+
+Everything should be modular and expandable for future features including:
+
+* artist portals
+* release management
+* royalty tracking
+* label management
+* booking systems
+* AI marketing tools
+* distribution tools
+* subscription SaaS features

@@ -1,0 +1,172 @@
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+
+const app = express();
+const PORT = process.env.PORT || 8080;
+
+// =======================
+// CORE MIDDLEWARE
+// =======================
+app.use(cors());
+app.use(helmet());
+app.use(express.json());
+
+// =======================
+// SIMPLE AUTH BYPASS LAYER (TEMP SAFE MODE)
+// Prevents random 403s while developing CRM
+// =======================
+app.use((req, res, next) => {
+  // Allow all /api routes for now
+  // You can replace this later with JWT/session auth
+  if (req.path.startsWith("/api")) {
+    return next();
+  }
+  next();
+});
+
+// =======================
+// HEALTH + PING (FIXES YOUR ISSUE)
+// =======================
+app.get("/api/ping", (req, res) => {
+  res.json({
+    ok: true,
+    service: "doubtless-crm",
+    time: new Date().toISOString(),
+  });
+});
+
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "healthy",
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    env: process.env.NODE_ENV,
+  });
+});
+
+// =======================
+// AUTH (PLACEHOLDER SAFE RESPONSES)
+// =======================
+app.get("/api/users/me", (req, res) => {
+  res.json({
+    id: 1,
+    name: "Demo User",
+    role: "admin",
+  });
+});
+
+app.get("/api/auth/microsoft/configured", (req, res) => {
+  res.json({ configured: false });
+});
+
+app.get("/api/auth/social/providers", (req, res) => {
+  res.json({
+    providers: ["microsoft", "google", "instagram"],
+  });
+});
+
+// =======================
+// DASHBOARD
+// =======================
+app.get("/api/dashboard/stats", (req, res) => {
+  res.json({
+    artists: 12,
+    outreachQueue: 4,
+    activeCampaigns: 2,
+  });
+});
+
+app.get("/api/dashboard/activity", (req, res) => {
+  res.json([
+    { type: "login", message: "User logged in" },
+    { type: "artist_added", message: "New artist added" },
+  ]);
+});
+
+// =======================
+// ARTIST CRM CORE
+// =======================
+let artists: any[] = [];
+
+app.get("/api/artists", (req, res) => {
+  res.json(artists);
+});
+
+app.post("/api/artists", (req, res) => {
+  const artist = {
+    id: Date.now(),
+    ...req.body,
+  };
+
+  artists.push(artist);
+
+  res.json({
+    success: true,
+    artist,
+  });
+});
+
+app.get("/api/artists/outreach/queue", (req, res) => {
+  res.json(artists.slice(0, 5));
+});
+
+// =======================
+// NOTIFICATIONS
+// =======================
+app.get("/api/notifications", (req, res) => {
+  res.json([
+    { id: 1, message: "System online" },
+    { id: 2, message: "CRM initialized" },
+  ]);
+});
+
+// =======================
+// INTEGRATIONS
+// =======================
+app.get("/api/integrations/workspace-connections", (req, res) => {
+  res.json([]);
+});
+
+app.get("/api/integrations/connections", (req, res) => {
+  res.json([]);
+});
+
+app.get("/api/integrations/custom-platforms", (req, res) => {
+  res.json([]);
+});
+
+// =======================
+// EMAIL SETTINGS
+// =======================
+app.get("/api/email-settings", (req, res) => {
+  res.json({
+    configured: false,
+  });
+});
+
+// =======================
+// THEME
+// =======================
+app.get("/api/theme", (req, res) => {
+  res.json({
+    theme: "dark",
+  });
+});
+
+// =======================
+// ADMIN
+// =======================
+app.get("/api/admin/role-permissions", (req, res) => {
+  res.json({
+    admin: ["*"],
+    user: ["read"],
+  });
+});
+
+// =======================
+// START SERVER
+// =======================
+app.listen(PORT, () => {
+  console.log(`CRM server running on port ${PORT}`);
+});

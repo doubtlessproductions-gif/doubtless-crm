@@ -1,0 +1,5913 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+  - name: auth
+  - name: users
+  - name: dashboard
+  - name: contacts
+  - name: deals
+  - name: admin
+  - name: theme
+  - name: messages
+  - name: files
+  - name: analytics
+  - name: templates
+  - name: payments
+  - name: calendar
+  - name: artists
+  - name: search
+  - name: video
+  - name: projects
+  - name: release-assets
+  - name: royalties
+  - name: content
+  - name: artist-profiles
+  - name: invoice-email-templates
+  - name: discovery
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterBody"
+      responses:
+        "201":
+          description: User registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/invite:
+    post:
+      operationId: createInvite
+      tags: [auth]
+      summary: Create a staff invite (admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteBody"
+      responses:
+        "201":
+          description: Invite created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/invite/{token}:
+    get:
+      operationId: validateInvite
+      tags: [auth]
+      summary: Validate a staff invite token
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invite info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteInfo"
+        "404":
+          description: Invite not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "410":
+          description: Invite expired or already used
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/invite/{token}/accept:
+    post:
+      operationId: acceptInvite
+      tags: [auth]
+      summary: Accept a staff invite and create account
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcceptInviteBody"
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "404":
+          description: Invite not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "410":
+          description: Invite expired or already used
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/me:
+    get:
+      operationId: getMe
+      tags: [users]
+      summary: Get current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: Get dashboard stats
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /dashboard/activity:
+    get:
+      operationId: getDashboardActivity
+      tags: [dashboard]
+      summary: Get recent activity
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Activity items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── CONTACTS ──────────────────────────────────────────────────────────
+  /contacts:
+    get:
+      operationId: listContacts
+      tags: [contacts]
+      summary: List all contacts
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+          required: false
+      responses:
+        "200":
+          description: Contact list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contact"
+    post:
+      operationId: createContact
+      tags: [contacts]
+      summary: Create a contact
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactBody"
+      responses:
+        "201":
+          description: Contact created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
+  /contacts/{id}:
+    get:
+      operationId: getContact
+      tags: [contacts]
+      summary: Get a contact
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateContact
+      tags: [contacts]
+      summary: Update a contact
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactBody"
+      responses:
+        "200":
+          description: Updated contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+    delete:
+      operationId: deleteContact
+      tags: [contacts]
+      summary: Delete a contact
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── DEALS ──────────────────────────────────────────────────────────────
+  /deals:
+    get:
+      operationId: listDeals
+      tags: [deals]
+      summary: List all deals
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: stage
+          schema:
+            type: string
+          required: false
+      responses:
+        "200":
+          description: Deal list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Deal"
+    post:
+      operationId: createDeal
+      tags: [deals]
+      summary: Create a deal
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DealBody"
+      responses:
+        "201":
+          description: Deal created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deal"
+
+  /deals/{id}:
+    get:
+      operationId: getDeal
+      tags: [deals]
+      summary: Get a deal
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DealDetail"
+    put:
+      operationId: updateDeal
+      tags: [deals]
+      summary: Update a deal
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DealBody"
+      responses:
+        "200":
+          description: Updated deal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deal"
+    delete:
+      operationId: deleteDeal
+      tags: [deals]
+      summary: Delete a deal
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /deals/{id}/stage:
+    patch:
+      operationId: updateDealStage
+      tags: [deals]
+      summary: Update deal stage
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStageBody"
+      responses:
+        "200":
+          description: Updated deal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deal"
+
+  /deals/{id}/notes:
+    post:
+      operationId: addDealNote
+      tags: [deals]
+      summary: Add a note to a deal
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DealNoteBody"
+      responses:
+        "201":
+          description: Note added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DealNote"
+
+  # ── ADMIN ──────────────────────────────────────────────────────────────
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      tags: [admin]
+      summary: List all users (admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminUser"
+
+  /admin/users/{id}/role:
+    patch:
+      operationId: adminUpdateUserRole
+      tags: [admin]
+      summary: Update user role (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRoleBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+
+  /admin/users/{id}/rate:
+    put:
+      operationId: adminSetUserRate
+      tags: [admin]
+      summary: Set per-user target hourly rate (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetUserRateBody"
+      responses:
+        "200":
+          description: Updated user rate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserRateResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/role-quotas:
+    get:
+      operationId: adminGetRoleQuotas
+      tags: [admin]
+      summary: Get all role quotas (admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Role quota list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoleQuota"
+    put:
+      operationId: adminSetRoleQuotas
+      tags: [admin]
+      summary: Upsert role quotas (admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetRoleQuotasBody"
+      responses:
+        "200":
+          description: Updated role quotas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoleQuota"
+
+  /admin/users/{id}/tabs:
+    get:
+      operationId: adminGetUserTabs
+      tags: [admin]
+      summary: Get user tab permissions (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User tab permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserTabsResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: adminUpdateUserTabs
+      tags: [admin]
+      summary: Update user tab permissions (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTabsBody"
+      responses:
+        "200":
+          description: Updated tab permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserTabsResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── PORTAL CLIENTS (admin + owner) ────────────────────────────────────
+  /admin/portal-clients:
+    get:
+      operationId: adminListPortalClients
+      tags: [admin]
+      summary: List all portal clients with deal counts (admin + owner)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Portal client list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminPortalClient"
+
+  /admin/portal-clients/{id}:
+    get:
+      operationId: adminGetPortalClientDetail
+      tags: [admin]
+      summary: Get portal client detail with linked deals and recent activity (admin + owner)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Portal client detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPortalClientDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/portal-invite:
+    post:
+      operationId: adminInvitePortalClient
+      tags: [admin]
+      summary: Invite a contact to the portal (admin + owner)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contactId]
+              properties:
+                contactId:
+                  type: integer
+      responses:
+        "200":
+          description: Invite URL generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  inviteUrl:
+                    type: string
+        "400":
+          description: Invalid input or contact has no email
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Contact not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/portal-reinvite/{id}:
+    post:
+      operationId: adminReinvitePortalClient
+      tags: [admin]
+      summary: Refresh invite token without resetting credentials (admin + owner)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: New invite URL (existing credentials remain valid)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  inviteUrl:
+                    type: string
+        "404":
+          description: Portal user not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/portal-reset/{id}:
+    post:
+      operationId: adminResetPortalClient
+      tags: [admin]
+      summary: Reset portal credentials — wipes password and forces re-acceptance (admin + owner)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Reset complete; new invite URL returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  inviteUrl:
+                    type: string
+        "404":
+          description: Portal user not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/portal-contacts:
+    get:
+      operationId: adminListPortalContacts
+      tags: [admin]
+      summary: List contacts with email not yet invited to portal (admin + owner)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Available contacts for portal invite
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContactSummary"
+
+  /admin/portal-users/{id}/status:
+    patch:
+      operationId: adminUpdatePortalUserStatus
+      tags: [admin]
+      summary: Activate or deactivate a portal user (admin + owner)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isActive]
+              properties:
+                isActive:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  isActive:
+                    type: boolean
+        "404":
+          description: Portal user not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/portal-users/{id}:
+    delete:
+      operationId: adminDeletePortalUser
+      tags: [admin]
+      summary: Remove a portal user entirely (admin + owner)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        "404":
+          description: Portal user not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── INTEGRATIONS ──────────────────────────────────────────────────────
+  /integrations/connections:
+    get:
+      operationId: getMyConnections
+      tags: [integrations]
+      summary: Get current user's integration connections
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of connections (credentials omitted)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserConnection"
+
+  /integrations/connect/{provider}:
+    post:
+      operationId: connectProvider
+      tags: [integrations]
+      summary: Connect a provider (Outlook/OneDrive verify connector; Dropbox takes accessToken)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectProviderBody"
+      responses:
+        "200":
+          description: Connection established
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserConnection"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Provider connector not available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /integrations/connections/{provider}:
+    delete:
+      operationId: disconnectProvider
+      tags: [integrations]
+      summary: Disconnect a provider
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Disconnected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                required: [ok]
+
+  # ── THEME ──────────────────────────────────────────────────────────────
+  /theme:
+    get:
+      operationId: getTheme
+      tags: [theme]
+      summary: Get workspace theme
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Theme settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Theme"
+    put:
+      operationId: updateTheme
+      tags: [theme]
+      summary: Update workspace theme (admin/manager only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ThemeBody"
+      responses:
+        "200":
+          description: Updated theme
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Theme"
+
+  # ── MESSAGES ──────────────────────────────────────────────────────────
+  /messages/threads:
+    get:
+      operationId: listThreads
+      tags: [messages]
+      summary: List all message threads
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Thread list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MessageThread"
+    post:
+      operationId: createThread
+      tags: [messages]
+      summary: Create a message thread
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateThreadBody"
+      responses:
+        "201":
+          description: Thread created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageThread"
+
+  /messages/threads/{id}:
+    get:
+      operationId: getThread
+      tags: [messages]
+      summary: Get thread with messages
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Thread detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ThreadDetail"
+
+  /messages/threads/{id}/messages:
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a message to a thread
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageBody"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+
+  # ── FILES ─────────────────────────────────────────────────────────────
+  /files/upload:
+    post:
+      operationId: uploadFile
+      tags: [files]
+      summary: Upload a file
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: File uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadedFile"
+
+  # ── ANALYTICS ─────────────────────────────────────────────────────────
+  /analytics/pipeline:
+    get:
+      operationId: getAnalyticsPipeline
+      tags: [analytics]
+      summary: Pipeline funnel by stage
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Pipeline funnel
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StageStat"
+
+  /analytics/revenue:
+    get:
+      operationId: getAnalyticsRevenue
+      tags: [analytics]
+      summary: Monthly revenue trends
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Monthly revenue
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MonthStat"
+
+  /analytics/activity:
+    get:
+      operationId: getAnalyticsActivity
+      tags: [analytics]
+      summary: Daily activity for last 30 days
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Daily activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DayStat"
+
+  /analytics/win-rate:
+    get:
+      operationId: getAnalyticsWinRate
+      tags: [analytics]
+      summary: Win rate and deal breakdown
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Win rate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WinRate"
+
+  /analytics/team:
+    get:
+      operationId: getAnalyticsTeam
+      tags: [analytics]
+      summary: Team performance leaderboard
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Team performance data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamPerformance"
+
+  /analytics/team/{userId}:
+    get:
+      operationId: getAnalyticsTeamMember
+      tags: [analytics]
+      summary: Individual team member analytics
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Member analytics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamMemberDetail"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── TEMPLATES ─────────────────────────────────────────────────────────
+  /templates:
+    get:
+      operationId: listTemplates
+      tags: [templates]
+      summary: List templates visible to the current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Template list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Template"
+    post:
+      operationId: createTemplate
+      tags: [templates]
+      summary: Create a template
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemplateBody"
+      responses:
+        "201":
+          description: Template created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+
+  /templates/{id}:
+    get:
+      operationId: getTemplate
+      tags: [templates]
+      summary: Get a template
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+    put:
+      operationId: updateTemplate
+      tags: [templates]
+      summary: Update a template
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemplateBody"
+      responses:
+        "200":
+          description: Updated template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+    delete:
+      operationId: deleteTemplate
+      tags: [templates]
+      summary: Delete a template
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /templates/{id}/render:
+    post:
+      operationId: renderTemplate
+      tags: [templates]
+      summary: Render a template with variable substitution
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenderTemplateBody"
+      responses:
+        "200":
+          description: Rendered output
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenderedTemplate"
+
+  # ── PAYMENTS ──────────────────────────────────────────────────────────
+  /payments:
+    get:
+      operationId: listPaymentLinks
+      tags: [payments]
+      summary: List all payment links
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Payment link list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PaymentLink"
+    post:
+      operationId: createPaymentLink
+      tags: [payments]
+      summary: Create a payment link (via Stripe if configured)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentLinkBody"
+      responses:
+        "201":
+          description: Payment link created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentLink"
+
+  /payments/{id}:
+    delete:
+      operationId: deletePaymentLink
+      tags: [payments]
+      summary: Delete a payment link
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── CALENDAR ──────────────────────────────────────────────────────────
+  /artists:
+    get:
+      operationId: listArtists
+      tags: [artists]
+      summary: List all artists
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: leadTier
+          in: query
+          schema:
+            type: string
+        - name: outreachStatus
+          in: query
+          schema:
+            type: string
+        - name: genre
+          in: query
+          schema:
+            type: string
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+        - name: followersEstimate
+          in: query
+          schema:
+            type: string
+        - name: engagementLevel
+          in: query
+          schema:
+            type: string
+        - name: labelStatus
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of artists
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Artist"
+    post:
+      operationId: createArtist
+      tags: [artists]
+      summary: Create artist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArtistBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artist"
+
+  /artists/{id}:
+    get:
+      operationId: getArtist
+      tags: [artists]
+      summary: Get artist by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Artist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artist"
+    put:
+      operationId: updateArtist
+      tags: [artists]
+      summary: Update artist
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArtistBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artist"
+    delete:
+      operationId: deleteArtist
+      tags: [artists]
+      summary: Delete artist
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /artists/{id}/ai-analysis:
+    post:
+      operationId: generateArtistAiAnalysis
+      tags: [artists]
+      summary: Generate or refresh AI analysis for an artist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: AI analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistAiAnalysis"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /artists/{id}/tasks:
+    get:
+      operationId: listArtistTasks
+      tags: [artists]
+      summary: List tasks for an artist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Task list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ArtistTask"
+    post:
+      operationId: createArtistTask
+      tags: [artists]
+      summary: Create a task for an artist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArtistTaskBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistTask"
+
+  /artists/{id}/tasks/{taskId}:
+    patch:
+      operationId: updateArtistTask
+      tags: [artists]
+      summary: Update (or complete) an artist task
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArtistTaskBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistTask"
+    delete:
+      operationId: deleteArtistTask
+      tags: [artists]
+      summary: Delete an artist task
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /artists/outreach/queue:
+    get:
+      operationId: getOutreachQueue
+      tags: [artists]
+      summary: Get all draft/approved outreach messages (global queue)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Queue items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OutreachQueueItem"
+
+  /artists/outreach/queue/{msgId}:
+    patch:
+      operationId: updateOutreachQueueItem
+      tags: [artists]
+      summary: Queue-level edit of an outreach message (admin/manager)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: msgId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OutreachUpdateBody"
+      responses:
+        "200":
+          description: Updated message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutreachMessage"
+    delete:
+      operationId: deleteOutreachQueueItem
+      tags: [artists]
+      summary: Discard a message from the outreach queue (admin/manager)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: msgId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /artists/outreach/analytics:
+    get:
+      operationId: getOutreachAnalytics
+      tags: [artists]
+      summary: Outreach aggregate analytics
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Outreach analytics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutreachAnalytics"
+
+  /artists/{id}/outreach/generate:
+    post:
+      operationId: generateOutreachMessage
+      tags: [artists]
+      summary: AI-generate an outreach message draft for an artist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OutreachGenerateBody"
+      responses:
+        "201":
+          description: Generated draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutreachMessage"
+
+  /artists/{id}/notes:
+    get:
+      operationId: listArtistNotes
+      tags: [artists]
+      summary: Get structured conversation history for an artist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Notes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ArtistNote"
+
+  /artists/{id}/outreach:
+    get:
+      operationId: listArtistOutreach
+      tags: [artists]
+      summary: List outreach messages for an artist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OutreachMessage"
+
+  /artists/{id}/outreach/{msgId}:
+    patch:
+      operationId: updateOutreachMessage
+      tags: [artists]
+      summary: Update/approve/edit an outreach message
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: msgId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OutreachUpdateBody"
+      responses:
+        "200":
+          description: Updated message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutreachMessage"
+    delete:
+      operationId: deleteOutreachMessage
+      tags: [artists]
+      summary: Delete an outreach message
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: msgId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /artists/{id}/outreach/{msgId}/send:
+    post:
+      operationId: sendOutreachMessage
+      tags: [artists]
+      summary: Send an outreach message via Outlook
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: msgId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sent message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutreachMessage"
+
+  /artists/outreach/bulk-send:
+    post:
+      operationId: bulkSendOutreach
+      tags: [artists]
+      summary: Send multiple approved outreach messages via Outlook in one action
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                msgIds:
+                  type: array
+                  items:
+                    type: integer
+              required: [msgIds]
+      responses:
+        "200":
+          description: Per-item send results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sent:
+                    type: array
+                    items:
+                      type: integer
+                  failed:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        reason:
+                          type: string
+                      required: [id, reason]
+                required: [sent, failed]
+
+  /artists/{id}/outreach/{msgId}/reply:
+    post:
+      operationId: markOutreachReplied
+      tags: [artists]
+      summary: Mark an outreach message as replied
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: msgId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OutreachReplyBody"
+      responses:
+        "200":
+          description: Updated message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutreachMessage"
+
+  /artist-saved-views:
+    get:
+      operationId: listArtistSavedViews
+      tags: [artists]
+      summary: List saved views for the current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Saved view list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ArtistSavedView"
+    post:
+      operationId: createArtistSavedView
+      tags: [artists]
+      summary: Create a saved view
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArtistSavedViewBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistSavedView"
+
+  /artist-saved-views/{id}:
+    delete:
+      operationId: deleteArtistSavedView
+      tags: [artists]
+      summary: Delete a saved view
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── ARTIST DUPLICATES ──────────────────────────────────────────────────
+  /artists/duplicates:
+    get:
+      operationId: listArtistDuplicates
+      tags: [artists]
+      summary: List duplicate candidates
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, dismissed, merged, all]
+      responses:
+        "200":
+          description: List of duplicate candidates with embedded artist data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ArtistDuplicateCandidate"
+
+  /artists/duplicates/{id}:
+    patch:
+      operationId: updateArtistDuplicate
+      tags: [artists]
+      summary: Dismiss or re-open a duplicate candidate
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArtistDuplicatePatchBody"
+      responses:
+        "200":
+          description: Updated candidate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistDuplicateCandidate"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /artists/duplicates/scan:
+    post:
+      operationId: scanArtistDuplicates
+      tags: [artists]
+      summary: Trigger a full duplicate scan
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Scan results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistDuplicateScanResult"
+
+  /artists/merge:
+    post:
+      operationId: mergeArtists
+      tags: [artists]
+      summary: Merge two artist profiles (transactional)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArtistMergeBody"
+      responses:
+        "200":
+          description: Merge successful — returns updated primary artist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistMergeResult"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Artist not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── ARTIST NETWORK & TERRITORY ────────────────────────────────────────
+  /artists/graph:
+    get:
+      operationId: getArtistGraph
+      tags: [artists]
+      summary: Get artist network graph data
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Graph data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistGraphData"
+
+  /artists/label-statuses:
+    get:
+      operationId: listCustomLabelStatuses
+      tags: [artists]
+      summary: List custom label statuses
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of custom label statuses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CustomLabelStatus"
+    post:
+      operationId: createCustomLabelStatus
+      tags: [artists]
+      summary: Create a custom label status
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                colorClass:
+                  type: string
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomLabelStatus"
+        "409":
+          description: Conflict
+
+  /artists/label-statuses/{key}:
+    delete:
+      operationId: deleteCustomLabelStatus
+      tags: [artists]
+      summary: Delete a custom label status
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: key
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+
+  /artists/territory-stats:
+    get:
+      operationId: getArtistTerritoryStats
+      tags: [artists]
+      summary: Get artist territory statistics grouped by city
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Territory stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistTerritoryStats"
+
+  /artists/{id}/relationships:
+    get:
+      operationId: listArtistRelationships
+      tags: [artists]
+      summary: List relationships for an artist
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Relationship list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ArtistRelationship"
+    post:
+      operationId: createArtistRelationship
+      tags: [artists]
+      summary: Create an artist relationship
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArtistRelationshipBody"
+      responses:
+        "201":
+          description: Relationship created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistRelationship"
+
+  /artists/{id}/relationships/{relId}:
+    delete:
+      operationId: deleteArtistRelationship
+      tags: [artists]
+      summary: Delete an artist relationship
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: relId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── DISCOVERY ──────────────────────────────────────────────────────────
+  /discovery/spotify/search:
+    get:
+      operationId: searchSpotifyArtists
+      tags: [discovery]
+      summary: Search Spotify for artists
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: genre
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Spotify artist results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpotifySearchPage"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: API keys not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /discovery/youtube/search:
+    get:
+      operationId: searchYoutubeChannels
+      tags: [discovery]
+      summary: Search YouTube for channels/artists
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: pageToken
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: YouTube channel results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YoutubeSearchPage"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: API keys not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /discovery/import:
+    post:
+      operationId: importDiscoveredArtist
+      tags: [discovery]
+      summary: Import a discovered artist into the CRM roster
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscoveryImportBody"
+      responses:
+        "200":
+          description: Artist already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoveryImportResult"
+        "201":
+          description: Artist created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoveryImportResult"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /search:
+    get:
+      operationId: globalSearch
+      tags: [search]
+      summary: Global search across contacts, deals, artists, templates
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResults"
+
+  /calendar:
+    get:
+      operationId: listCalendarEvents
+      tags: [calendar]
+      summary: List calendar events for current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Event list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalendarEvent"
+    post:
+      operationId: createCalendarEvent
+      tags: [calendar]
+      summary: Create a calendar event (syncs to Google Calendar if configured)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCalendarEventBody"
+      responses:
+        "201":
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarEvent"
+
+  /calendar/{id}:
+    delete:
+      operationId: deleteCalendarEvent
+      tags: [calendar]
+      summary: Delete a calendar event
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── VIDEO PROJECTS ────────────────────────────────────────────────────
+  /video-projects:
+    get:
+      operationId: listVideoProjects
+      tags: [video]
+      summary: List all video projects
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: releaseId
+          in: query
+          schema:
+            type: integer
+        - name: artistId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of video projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VideoProject"
+    post:
+      operationId: createVideoProject
+      tags: [video]
+      summary: Create a video project record
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VideoProjectBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoProject"
+
+  /video-projects/{id}:
+    get:
+      operationId: getVideoProject
+      tags: [video]
+      summary: Get video project by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Video project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoProject"
+    put:
+      operationId: updateVideoProject
+      tags: [video]
+      summary: Update video project metadata
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VideoProjectBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoProject"
+    delete:
+      operationId: deleteVideoProject
+      tags: [video]
+      summary: Delete video project
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /video-projects/{id}/upload:
+    post:
+      operationId: uploadVideoFile
+      tags: [video]
+      summary: Upload video file (multipart); triggers FFmpeg processing
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                video:
+                  type: string
+                  format: binary
+              required: [video]
+      responses:
+        "202":
+          description: Upload accepted; processing started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoProject"
+
+  /invoice-email-templates:
+    get:
+      operationId: listInvoiceEmailTemplates
+      tags: [invoice-email-templates]
+      summary: List all invoice email templates
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InvoiceEmailTemplate"
+    post:
+      operationId: createInvoiceEmailTemplate
+      tags: [invoice-email-templates]
+      summary: Create an invoice email template
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceEmailTemplateBody"
+      responses:
+        "201":
+          description: Template created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceEmailTemplate"
+
+  /invoice-email-templates/{id}:
+    put:
+      operationId: updateInvoiceEmailTemplate
+      tags: [invoice-email-templates]
+      summary: Update an invoice email template
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceEmailTemplateBody"
+      responses:
+        "200":
+          description: Template updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceEmailTemplate"
+    delete:
+      operationId: deleteInvoiceEmailTemplate
+      tags: [invoice-email-templates]
+      summary: Delete an invoice email template
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /video-projects/{id}/invoice:
+    post:
+      operationId: createVideoInvoice
+      tags: [video]
+      summary: Create Stripe invoice for a video project (locks download)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VideoInvoiceBody"
+      responses:
+        "200":
+          description: Invoice created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoProject"
+
+  /video-projects/{id}/unlock:
+    post:
+      operationId: unlockVideoProject
+      tags: [video]
+      summary: Manually unlock a video project (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Unlocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoProject"
+
+  /video-projects/webhook/stripe:
+    post:
+      operationId: videoStripeWebhook
+      tags: [video]
+      summary: Stripe webhook endpoint for video payment events
+      responses:
+        "200":
+          description: Acknowledged
+
+  # ── PROJECTS ──────────────────────────────────────────────────────────
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List projects
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: artistId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a project
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get project by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+    put:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update project
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      summary: Delete project
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── RELEASE ASSETS ─────────────────────────────────────────────────────
+  /release-assets:
+    get:
+      operationId: listReleaseAssets
+      tags: [release-assets]
+      summary: List assets for a release
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: releaseId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of assets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReleaseAsset"
+    post:
+      operationId: uploadReleaseAsset
+      tags: [release-assets]
+      summary: Upload a release asset (multipart)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                releaseId:
+                  type: integer
+                type:
+                  type: string
+                notes:
+                  type: string
+              required: [file, releaseId, type]
+      responses:
+        "201":
+          description: Asset uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleaseAsset"
+
+  /release-assets/{id}:
+    delete:
+      operationId: deleteReleaseAsset
+      tags: [release-assets]
+      summary: Delete a release asset
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── ROYALTIES ─────────────────────────────────────────────────────────
+  /royalties:
+    get:
+      operationId: listRoyalties
+      tags: [royalties]
+      summary: List royalty records
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: artistId
+          in: query
+          schema:
+            type: integer
+        - name: releaseId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of royalties
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Royalty"
+    post:
+      operationId: createRoyalty
+      tags: [royalties]
+      summary: Create a royalty record
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoyaltyBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Royalty"
+
+  /royalties/{id}:
+    get:
+      operationId: getRoyalty
+      tags: [royalties]
+      summary: Get royalty record by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Royalty record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Royalty"
+    put:
+      operationId: updateRoyalty
+      tags: [royalties]
+      summary: Update royalty record (e.g. mark as paid)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoyaltyBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Royalty"
+    delete:
+      operationId: deleteRoyalty
+      tags: [royalties]
+      summary: Delete a royalty record
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── CONTENT POSTS ──────────────────────────────────────────────────────
+  /content-posts:
+    get:
+      operationId: listContentPosts
+      tags: [content]
+      summary: List content posts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: releaseId
+          in: query
+          schema:
+            type: integer
+        - name: platform
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of content posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContentPost"
+    post:
+      operationId: createContentPost
+      tags: [content]
+      summary: Create a content post
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContentPostBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentPost"
+
+  /content-posts/{id}:
+    get:
+      operationId: getContentPost
+      tags: [content]
+      summary: Get content post by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Content post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentPost"
+    put:
+      operationId: updateContentPost
+      tags: [content]
+      summary: Update content post
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContentPostBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentPost"
+    delete:
+      operationId: deleteContentPost
+      tags: [content]
+      summary: Delete content post
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── ARTIST PROFILES ────────────────────────────────────────────────────
+  /artist-profiles/{artistId}:
+    get:
+      operationId: getArtistProfile
+      tags: [artist-profiles]
+      summary: Get extended profile for an artist
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: artistId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Artist profile (may be null if not yet created)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistProfile"
+        "404":
+          description: Not found
+    put:
+      operationId: upsertArtistProfile
+      tags: [artist-profiles]
+      summary: Create or update extended artist profile
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: artistId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArtistProfileBody"
+      responses:
+        "200":
+          description: Upserted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistProfile"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+
+    RegisterBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+      required: [name, email, password]
+
+    LoginBody:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required: [email, password]
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required: [token, user]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        userType:
+          type: string
+        allowedTabs:
+          type: array
+          items:
+            type: string
+          nullable: true
+        colorMode:
+          type: string
+          enum: [light, dark]
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        permissions:
+          type: object
+          additionalProperties:
+            type: boolean
+          nullable: true
+      required: [id, name, email, role, createdAt]
+
+    DashboardStats:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+        activeToday:
+          type: integer
+        totalLogins:
+          type: integer
+        memberSince:
+          type: string
+          format: date-time
+        totalContacts:
+          type: integer
+        openDeals:
+          type: integer
+        pipelineValue:
+          type: number
+        wonDeals:
+          type: integer
+        mrr:
+          type: number
+        winRate:
+          type: number
+          nullable: true
+        pipelineByStage:
+          type: array
+          items:
+            type: object
+            properties:
+              stage:
+                type: string
+              value:
+                type: number
+              count:
+                type: integer
+            required: [stage, value, count]
+        revenueTrend:
+          type: array
+          items:
+            type: object
+            properties:
+              month:
+                type: string
+              revenue:
+                type: number
+            required: [month, revenue]
+        topContacts:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+              company:
+                type: string
+                nullable: true
+              totalValue:
+                type: number
+              dealCount:
+                type: integer
+            required: [id, name, totalValue, dealCount]
+        upcomingEvents:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              startTime:
+                type: string
+                format: date-time
+              endTime:
+                type: string
+                format: date-time
+              meetLink:
+                type: string
+                nullable: true
+            required: [id, title, startTime, endTime]
+      required: [totalUsers, activeToday, totalLogins, memberSince, totalContacts, openDeals, pipelineValue, wonDeals, mrr, pipelineByStage, revenueTrend, topContacts, upcomingEvents]
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        action:
+          type: string
+        description:
+          type: string
+        actorName:
+          type: string
+          nullable: true
+        entityType:
+          type: string
+          nullable: true
+        entityId:
+          type: integer
+          nullable: true
+        entityLabel:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, action, description, createdAt]
+
+    ContactBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        company:
+          type: string
+        organization:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        notes:
+          type: string
+      required: [name]
+
+    ContactSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          nullable: true
+      required: [id, name]
+
+    Contact:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        company:
+          type: string
+          nullable: true
+        organization:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, tags, createdAt, updatedAt]
+
+    ContactDetail:
+      allOf:
+        - $ref: "#/components/schemas/Contact"
+        - type: object
+          properties:
+            deals:
+              type: array
+              items:
+                $ref: "#/components/schemas/Deal"
+          required: [deals]
+
+    DealBody:
+      type: object
+      properties:
+        title:
+          type: string
+        value:
+          type: number
+          nullable: true
+        stage:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high]
+          nullable: true
+        expectedCloseDate:
+          type: string
+          format: date
+          nullable: true
+        contactId:
+          type: integer
+          nullable: true
+        assignedTo:
+          type: integer
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+      required: [title]
+
+    Deal:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        value:
+          type: number
+          nullable: true
+        stage:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high]
+        expectedCloseDate:
+          type: string
+          format: date
+          nullable: true
+        contactId:
+          type: integer
+          nullable: true
+        contactName:
+          type: string
+          nullable: true
+        assignedTo:
+          type: integer
+          nullable: true
+        assignedToName:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        closedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, title, stage, priority, createdAt, updatedAt]
+
+    DealDetail:
+      allOf:
+        - $ref: "#/components/schemas/Deal"
+        - type: object
+          properties:
+            dealNotes:
+              type: array
+              items:
+                $ref: "#/components/schemas/DealNote"
+          required: [dealNotes]
+
+    UpdateStageBody:
+      type: object
+      properties:
+        stage:
+          type: string
+      required: [stage]
+
+    DealNoteBody:
+      type: object
+      properties:
+        content:
+          type: string
+      required: [content]
+
+    DealNote:
+      type: object
+      properties:
+        id:
+          type: integer
+        dealId:
+          type: integer
+        authorId:
+          type: integer
+        authorName:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, dealId, authorId, authorName, content, createdAt]
+
+    UserConnection:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+          nullable: true
+        provider:
+          type: string
+        displayName:
+          type: string
+        connectedAt:
+          type: string
+          format: date-time
+        isWorkspace:
+          type: boolean
+      required: [id, provider, displayName, connectedAt]
+
+    ConnectProviderBody:
+      type: object
+      properties:
+        accessToken:
+          type: string
+      required: []
+
+    AdminPortalClient:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        isActive:
+          type: boolean
+        inviteAcceptedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+        dealCount:
+          type: integer
+        contact:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            email:
+              type: string
+      required: [id, email, isActive, dealCount]
+
+    AdminPortalClientDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        isActive:
+          type: boolean
+        inviteAcceptedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+        contact:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            email:
+              type: string
+        deals:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              status:
+                type: string
+              value:
+                type: string
+                nullable: true
+        recentActivity:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              content:
+                type: string
+              createdAt:
+                type: string
+                format: date-time
+      required: [id, email, isActive, deals, recentActivity]
+
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        userType:
+          type: string
+        targetHourlyRate:
+          type: string
+          nullable: true
+        allowedTabs:
+          type: array
+          items:
+            type: string
+          nullable: true
+        colorMode:
+          type: string
+          enum: [light, dark]
+          nullable: true
+        connectedProviders:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, name, email, role, createdAt, connectedProviders]
+
+    MemberRate:
+      type: object
+      properties:
+        userId:
+          type: integer
+        name:
+          type: string
+        role:
+          type: string
+        targetHourlyRate:
+          type: string
+          nullable: true
+      required: [userId, name, role]
+
+    TimeSettings:
+      type: object
+      properties:
+        id:
+          type: integer
+        workspaceId:
+          type: integer
+        targetHourlyRate:
+          type: string
+        currency:
+          type: string
+        memberRates:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberRate"
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, workspaceId, targetHourlyRate, currency, memberRates]
+
+    TimeSettingsBody:
+      type: object
+      properties:
+        targetHourlyRate:
+          type: number
+        currency:
+          type: string
+        memberRates:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: integer
+              targetHourlyRate:
+                type: number
+                nullable: true
+            required: [userId, targetHourlyRate]
+      required: [targetHourlyRate, currency]
+
+    InviteBody:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [owner, admin, manager, artist, engineer, ar, intern]
+      required: [email]
+
+    InviteResponse:
+      type: object
+      properties:
+        inviteToken:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        emailSent:
+          type: boolean
+      required: [inviteToken, email, role, expiresAt, emailSent]
+
+    InviteInfo:
+      type: object
+      properties:
+        email:
+          type: string
+        role:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required: [email, role, expiresAt]
+
+    AcceptInviteBody:
+      type: object
+      properties:
+        name:
+          type: string
+        password:
+          type: string
+          minLength: 8
+      required: [name, password]
+
+    UserTabsResponse:
+      type: object
+      properties:
+        allowedTabs:
+          type: array
+          items:
+            type: string
+          nullable: true
+      required: []
+
+    UpdateTabsBody:
+      type: object
+      properties:
+        allowedTabs:
+          type: array
+          items:
+            type: string
+          nullable: true
+      required: [allowedTabs]
+
+    UpdateRoleBody:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [owner, admin, manager, artist, engineer, ar, intern]
+      required: [role]
+
+    Theme:
+      type: object
+      properties:
+        id:
+          type: integer
+        primaryColor:
+          type: string
+        accentColor:
+          type: string
+        logoUrl:
+          type: string
+          nullable: true
+        companyName:
+          type: string
+        sidebarConfig:
+          type: object
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, primaryColor, accentColor, companyName, updatedAt]
+
+    ThemeBody:
+      type: object
+      properties:
+        primaryColor:
+          type: string
+        accentColor:
+          type: string
+        logoUrl:
+          type: string
+          nullable: true
+        companyName:
+          type: string
+        sidebarConfig:
+          type: object
+          nullable: true
+
+    # ── MESSAGING SCHEMAS ─────────────────────────────────────────────────
+    MessageThread:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        dealId:
+          type: integer
+          nullable: true
+        contactId:
+          type: integer
+          nullable: true
+        title:
+          type: string
+        createdBy:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        lastMessage:
+          type: string
+          nullable: true
+        messageCount:
+          type: integer
+      required: [id, type, title, createdBy, createdAt, messageCount]
+
+    CreateThreadBody:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [deal, contact, general]
+        dealId:
+          type: integer
+          nullable: true
+        contactId:
+          type: integer
+          nullable: true
+        title:
+          type: string
+      required: [title, type]
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        threadId:
+          type: integer
+        authorId:
+          type: integer
+        authorName:
+          type: string
+        content:
+          type: string
+        fileUrl:
+          type: string
+          nullable: true
+        fileName:
+          type: string
+          nullable: true
+        fileSize:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, threadId, authorId, authorName, content, createdAt]
+
+    ThreadDetail:
+      allOf:
+        - $ref: "#/components/schemas/MessageThread"
+        - type: object
+          properties:
+            messages:
+              type: array
+              items:
+                $ref: "#/components/schemas/ChatMessage"
+          required: [messages]
+
+    SendMessageBody:
+      type: object
+      properties:
+        content:
+          type: string
+        fileUrl:
+          type: string
+          nullable: true
+        fileName:
+          type: string
+          nullable: true
+        fileSize:
+          type: integer
+          nullable: true
+      required: [content]
+
+    UploadedFile:
+      type: object
+      properties:
+        url:
+          type: string
+        name:
+          type: string
+        size:
+          type: integer
+      required: [url, name, size]
+
+    # ── ANALYTICS SCHEMAS ─────────────────────────────────────────────────
+    StageStat:
+      type: object
+      properties:
+        stage:
+          type: string
+        count:
+          type: integer
+        value:
+          type: number
+      required: [stage, count, value]
+
+    MonthStat:
+      type: object
+      properties:
+        month:
+          type: string
+        pipelineValue:
+          type: number
+        wonValue:
+          type: number
+        dealCount:
+          type: integer
+      required: [month, pipelineValue, wonValue, dealCount]
+
+    DayStat:
+      type: object
+      properties:
+        date:
+          type: string
+        count:
+          type: integer
+      required: [date, count]
+
+    WinRate:
+      type: object
+      properties:
+        winRate:
+          type: number
+        totalClosed:
+          type: integer
+        won:
+          type: integer
+        lost:
+          type: integer
+        openDeals:
+          type: integer
+      required: [winRate, totalClosed, won, lost, openDeals]
+
+    # ── TEMPLATE SCHEMAS ──────────────────────────────────────────────────
+    TemplateBody:
+      type: object
+      properties:
+        title:
+          type: string
+        type:
+          type: string
+          enum: [email, proposal, sms]
+        subject:
+          type: string
+          nullable: true
+        body:
+          type: string
+        variables:
+          type: array
+          items:
+            type: string
+        isShared:
+          type: boolean
+      required: [title, body]
+
+    Template:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        type:
+          type: string
+        subject:
+          type: string
+          nullable: true
+        body:
+          type: string
+        variables:
+          type: array
+          items:
+            type: string
+        isShared:
+          type: boolean
+        createdBy:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, title, type, body, variables, isShared, createdBy, createdAt, updatedAt]
+
+    RenderTemplateBody:
+      type: object
+      properties:
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+
+    RenderedTemplate:
+      type: object
+      properties:
+        subject:
+          type: string
+          nullable: true
+        body:
+          type: string
+      required: [body]
+
+    # ── PAYMENT SCHEMAS ───────────────────────────────────────────────────
+    CreatePaymentLinkBody:
+      type: object
+      properties:
+        title:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        dealId:
+          type: integer
+          nullable: true
+      required: [title, amount]
+
+    PaymentLink:
+      type: object
+      properties:
+        id:
+          type: integer
+        dealId:
+          type: integer
+          nullable: true
+        title:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        stripePaymentLinkId:
+          type: string
+          nullable: true
+        stripeUrl:
+          type: string
+          nullable: true
+        status:
+          type: string
+        createdBy:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, title, amount, currency, status, createdBy, createdAt]
+
+    # ── CALENDAR SCHEMAS ──────────────────────────────────────────────────
+    CreateCalendarEventBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        attendeeEmails:
+          type: array
+          items:
+            type: string
+        dealId:
+          type: integer
+          nullable: true
+        contactId:
+          type: integer
+          nullable: true
+        meetingUrl:
+          type: string
+          nullable: true
+          description: Custom meeting link (Zoom, Teams, Webex, Calendly, etc.)
+      required: [title, startTime, endTime]
+
+    CalendarEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        dealId:
+          type: integer
+          nullable: true
+        contactId:
+          type: integer
+          nullable: true
+        googleEventId:
+          type: string
+          nullable: true
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        attendeeEmails:
+          type: array
+          items:
+            type: string
+        meetLink:
+          type: string
+          nullable: true
+        meetingUrl:
+          type: string
+          nullable: true
+          description: Custom meeting link (Zoom, Teams, Webex, Calendly, etc.)
+        createdBy:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, title, startTime, endTime, attendeeEmails, createdBy, createdAt]
+
+    # ── ARTIST SCHEMAS ────────────────────────────────────────────────────
+    ArtistBody:
+      type: object
+      properties:
+        name:
+          type: string
+        genre:
+          type: string
+          nullable: true
+        labelStatus:
+          type: array
+          items:
+            type: string
+        bio:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        country:
+          type: string
+          nullable: true
+        outreachStatus:
+          type: string
+          enum: [new, contacted, in_talks, signed, passed]
+        revenuePotential:
+          type: string
+          nullable: true
+        followersEstimate:
+          type: string
+          nullable: true
+        engagementLevel:
+          type: string
+          enum: [low, medium, high]
+          nullable: true
+        streamingLinks:
+          type: object
+          additionalProperties:
+            type: string
+        socialLinks:
+          type: object
+          additionalProperties:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        contactId:
+          type: integer
+          nullable: true
+        spotifyId:
+          type: string
+          nullable: true
+        youtubeChannelId:
+          type: string
+          nullable: true
+        originCity:
+          type: string
+          nullable: true
+        originState:
+          type: string
+          nullable: true
+        originCountry:
+          type: string
+          nullable: true
+        photoUrls:
+          type: array
+          items:
+            type: string
+      required: [name]
+
+    Artist:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        genre:
+          type: string
+          nullable: true
+        labelStatus:
+          type: array
+          items:
+            type: string
+        bio:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        country:
+          type: string
+          nullable: true
+        lat:
+          type: number
+          format: float
+          nullable: true
+        lng:
+          type: number
+          format: float
+          nullable: true
+        outreachStatus:
+          type: string
+        revenuePotential:
+          type: string
+          nullable: true
+        followersEstimate:
+          type: string
+          nullable: true
+        engagementLevel:
+          type: string
+          enum: [low, medium, high]
+          nullable: true
+        imageUrl:
+          type: string
+          nullable: true
+        spotifyId:
+          type: string
+          nullable: true
+        youtubeChannelId:
+          type: string
+          nullable: true
+        originCity:
+          type: string
+          nullable: true
+        originState:
+          type: string
+          nullable: true
+        originCountry:
+          type: string
+          nullable: true
+        photoUrls:
+          type: array
+          items:
+            type: string
+        streamingLinks:
+          type: object
+          additionalProperties:
+            type: string
+        socialLinks:
+          type: object
+          additionalProperties:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        contactId:
+          type: integer
+          nullable: true
+        aiAnalysis:
+          $ref: "#/components/schemas/ArtistAiAnalysis"
+          nullable: true
+        createdBy:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, labelStatus, outreachStatus, streamingLinks, socialLinks, tags, createdBy, createdAt, updatedAt]
+
+    ArtistAiAnalysis:
+      type: object
+      properties:
+        id:
+          type: integer
+        artistId:
+          type: integer
+        summary:
+          type: string
+        brandingScore:
+          type: integer
+        growthScore:
+          type: integer
+        professionalismScore:
+          type: integer
+        leadTier:
+          type: string
+        recommendations:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, artistId, summary, brandingScore, growthScore, professionalismScore, leadTier, recommendations, createdAt, updatedAt]
+
+    ArtistTask:
+      type: object
+      properties:
+        id:
+          type: integer
+        artistId:
+          type: integer
+        title:
+          type: string
+        dueDate:
+          type: string
+          nullable: true
+        assigneeId:
+          type: integer
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdBy:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, artistId, title, createdBy, createdAt]
+
+    ArtistTaskBody:
+      type: object
+      properties:
+        title:
+          type: string
+        dueDate:
+          type: string
+          nullable: true
+        assigneeId:
+          type: integer
+          nullable: true
+        completed:
+          type: boolean
+      required: [title]
+
+    ArtistSavedView:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        name:
+          type: string
+        filters:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, userId, name, filters, createdAt]
+
+    OutreachMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        artistId:
+          type: integer
+        type:
+          type: string
+          enum: [dm, email, proposal, recommendation]
+        subject:
+          type: string
+          nullable: true
+        body:
+          type: string
+        status:
+          type: string
+          enum: [draft, approved, sent, replied]
+        contextNotes:
+          type: string
+          nullable: true
+        recipientEmail:
+          type: string
+          nullable: true
+        createdBy:
+          type: integer
+        approvedBy:
+          type: integer
+          nullable: true
+        sentAt:
+          type: string
+          format: date-time
+          nullable: true
+        repliedAt:
+          type: string
+          format: date-time
+          nullable: true
+        replyNotes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, artistId, type, body, status, createdBy, createdAt, updatedAt]
+
+    OutreachQueueItem:
+      allOf:
+        - $ref: "#/components/schemas/OutreachMessage"
+        - type: object
+          properties:
+            artistName:
+              type: string
+            artistGenre:
+              type: string
+              nullable: true
+            creatorName:
+              type: string
+          required: [artistName, creatorName]
+
+    OutreachGenerateBody:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [dm, email, proposal, recommendation]
+        contextNotes:
+          type: string
+        recipientEmail:
+          type: string
+          format: email
+      required: [type]
+
+    OutreachUpdateBody:
+      type: object
+      properties:
+        subject:
+          type: string
+        body:
+          type: string
+        status:
+          type: string
+          enum: [draft, approved]
+          description: "Only draft/approved allowed here. Use /send for sent, /reply for replied."
+        recipientEmail:
+          type: string
+          nullable: true
+        replyNotes:
+          type: string
+          nullable: true
+
+    ArtistNote:
+      type: object
+      properties:
+        id:
+          type: integer
+        artistId:
+          type: integer
+        authorId:
+          type: integer
+        authorName:
+          type: string
+        type:
+          type: string
+          enum: [outreach_sent, outreach_reply, manual]
+        subject:
+          type: string
+          nullable: true
+        body:
+          type: string
+        sentTo:
+          type: string
+          nullable: true
+        outreachMsgId:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, artistId, authorId, authorName, type, body, createdAt]
+
+    ArtistDuplicateCandidate:
+      type: object
+      properties:
+        id:
+          type: integer
+        artistIdA:
+          type: integer
+        artistIdB:
+          type: integer
+        confidenceScore:
+          type: number
+          format: float
+        evidence:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [pending, dismissed, merged]
+        reviewedBy:
+          type: integer
+          nullable: true
+        reviewedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        artistA:
+          nullable: true
+          $ref: "#/components/schemas/Artist"
+        artistB:
+          nullable: true
+          $ref: "#/components/schemas/Artist"
+      required: [id, artistIdA, artistIdB, confidenceScore, evidence, status, createdAt]
+
+    ArtistDuplicatePatchBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [dismissed, pending]
+      required: [status]
+
+    ArtistDuplicateScanResult:
+      type: object
+      properties:
+        scanned:
+          type: integer
+        candidates:
+          type: integer
+      required: [scanned, candidates]
+
+    ArtistMergeBody:
+      type: object
+      properties:
+        primaryId:
+          type: integer
+        secondaryId:
+          type: integer
+        fieldPreferences:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [a, b]
+      required: [primaryId, secondaryId]
+
+    ArtistMergeResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        artist:
+          $ref: "#/components/schemas/Artist"
+      required: [ok, artist]
+
+    OutreachReplyBody:
+      type: object
+      properties:
+        replyNotes:
+          type: string
+
+    OutreachAnalytics:
+      type: object
+      properties:
+        totalGenerated:
+          type: integer
+        totalSent:
+          type: integer
+        totalReplied:
+          type: integer
+        responseRate:
+          type: integer
+        byStatus:
+          type: object
+          additionalProperties:
+            type: integer
+        byMember:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: integer
+              name:
+                type: string
+              generated:
+                type: integer
+              sent:
+                type: integer
+              replied:
+                type: integer
+              responseRate:
+                type: integer
+            required: [userId, name, generated, sent, replied, responseRate]
+        byGenre:
+          type: array
+          items:
+            type: object
+            properties:
+              genre:
+                type: string
+              count:
+                type: integer
+            required: [genre, count]
+        byType:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              count:
+                type: integer
+            required: [type, count]
+        byRegion:
+          type: array
+          items:
+            type: object
+            properties:
+              region:
+                type: string
+              count:
+                type: integer
+            required: [region, count]
+      required: [totalGenerated, totalSent, totalReplied, responseRate, byStatus, byMember, byGenre, byType, byRegion]
+
+    ArtistSavedViewBody:
+      type: object
+      properties:
+        name:
+          type: string
+        filters:
+          type: object
+          additionalProperties: true
+      required: [name, filters]
+
+    # ── SEARCH SCHEMAS ────────────────────────────────────────────────────
+    SearchResults:
+      type: object
+      properties:
+        contacts:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+              email:
+                type: string
+                nullable: true
+              company:
+                type: string
+                nullable: true
+            required: [id, name]
+        deals:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              stage:
+                type: string
+              value:
+                type: string
+                nullable: true
+            required: [id, title, stage]
+        artists:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+              genre:
+                type: string
+                nullable: true
+              labelStatus:
+                type: array
+                items:
+                  type: string
+            required: [id, name, labelStatus]
+        templates:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              type:
+                type: string
+            required: [id, title, type]
+      required: [contacts, deals, artists, templates]
+
+    VideoProject:
+      type: object
+      properties:
+        id:
+          type: integer
+        releaseId:
+          type: integer
+          nullable: true
+        artistId:
+          type: integer
+          nullable: true
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [uploading, processing, watermarked, unlocked, failed]
+        originalKey:
+          type: string
+          nullable: true
+        watermarkedKey:
+          type: string
+          nullable: true
+        previewKey:
+          type: string
+          nullable: true
+        thumbnailKey:
+          type: string
+          nullable: true
+        durationSeconds:
+          type: integer
+          nullable: true
+        sizeBytes:
+          type: integer
+          nullable: true
+        downloadEnabled:
+          type: boolean
+        stripeInvoiceId:
+          type: string
+          nullable: true
+        stripeInvoiceUrl:
+          type: string
+          nullable: true
+        invoiceAmountCents:
+          type: integer
+          nullable: true
+        lockedAt:
+          type: string
+          nullable: true
+        unlockedAt:
+          type: string
+          nullable: true
+        uploadedBy:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, title, status, downloadEnabled, uploadedBy, createdAt, updatedAt]
+
+    VideoProjectBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        releaseId:
+          type: integer
+        artistId:
+          type: integer
+        contactId:
+          type: integer
+        invoiceAmountCents:
+          type: integer
+      required: [title]
+
+    VideoInvoiceBody:
+      type: object
+      properties:
+        amountCents:
+          type: integer
+        description:
+          type: string
+        customerEmail:
+          type: string
+      required: [amountCents]
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        artistId:
+          type: integer
+          nullable: true
+        releaseId:
+          type: integer
+          nullable: true
+        contactId:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [planning, in_progress, mixing, mastering, delivered, archived]
+        deadline:
+          type: string
+          nullable: true
+        budgetCents:
+          type: integer
+          nullable: true
+        createdBy:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, title, status, createdBy, createdAt, updatedAt]
+
+    ProjectBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        artistId:
+          type: integer
+          nullable: true
+        releaseId:
+          type: integer
+          nullable: true
+        contactId:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [planning, in_progress, mixing, mastering, delivered, archived]
+        deadline:
+          type: string
+        budgetCents:
+          type: integer
+      required: [title]
+
+    PortalNotification:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+          nullable: true
+        entityType:
+          type: string
+          nullable: true
+        entityId:
+          type: integer
+          nullable: true
+        read:
+          type: boolean
+        createdAt:
+          type: string
+      required: [id, type, title, read, createdAt]
+
+    ReleaseAsset:
+      type: object
+      properties:
+        id:
+          type: integer
+        releaseId:
+          type: integer
+        type:
+          type: string
+          enum: [audio_master, cover_art, music_video, social_clip, press_photo, lyrics_sheet, other]
+        filename:
+          type: string
+        originalName:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+        storageKey:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        uploadedBy:
+          type: integer
+        createdAt:
+          type: string
+      required: [id, releaseId, type, filename, originalName, mimeType, sizeBytes, storageKey, uploadedBy, createdAt]
+
+    Royalty:
+      type: object
+      properties:
+        id:
+          type: integer
+        artistId:
+          type: integer
+        releaseId:
+          type: integer
+          nullable: true
+        periodStart:
+          type: string
+        periodEnd:
+          type: string
+        streamCount:
+          type: integer
+        grossCents:
+          type: integer
+        netCents:
+          type: integer
+        splitPct:
+          type: integer
+        status:
+          type: string
+          enum: [pending, processing, paid, disputed]
+        paidAt:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, artistId, periodStart, periodEnd, streamCount, grossCents, netCents, splitPct, status, createdAt]
+
+    RoyaltyBody:
+      type: object
+      properties:
+        artistId:
+          type: integer
+        releaseId:
+          type: integer
+        periodStart:
+          type: string
+        periodEnd:
+          type: string
+        streamCount:
+          type: integer
+        grossCents:
+          type: integer
+        netCents:
+          type: integer
+        splitPct:
+          type: integer
+        status:
+          type: string
+          enum: [pending, processing, paid, disputed]
+        notes:
+          type: string
+      required: [artistId, periodStart, periodEnd, streamCount, grossCents, netCents, splitPct]
+
+    ContentPost:
+      type: object
+      properties:
+        id:
+          type: integer
+        releaseId:
+          type: integer
+          nullable: true
+        platform:
+          type: string
+          enum: [instagram, tiktok, twitter, youtube, facebook, email, sms, slack, linkedin]
+        scheduledAt:
+          type: string
+        copy:
+          type: string
+        mediaUrls:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [draft, scheduled, posted, cancelled, failed, posting]
+        postedAt:
+          type: string
+          nullable: true
+        createdBy:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, platform, scheduledAt, copy, mediaUrls, status, createdBy, createdAt, updatedAt]
+
+    ContentPostBody:
+      type: object
+      properties:
+        releaseId:
+          type: integer
+        platform:
+          type: string
+          enum: [instagram, tiktok, twitter, youtube, facebook, email, sms, slack, linkedin]
+        scheduledAt:
+          type: string
+        copy:
+          type: string
+        mediaUrls:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [draft, scheduled, posted, cancelled, failed, posting]
+      required: [platform, scheduledAt]
+
+    ArtistProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        artistId:
+          type: integer
+        royaltySplitPct:
+          type: integer
+        bankDetails:
+          type: object
+          additionalProperties:
+            type: string
+        contractStart:
+          type: string
+          nullable: true
+        contractEnd:
+          type: string
+          nullable: true
+        tier:
+          type: string
+          enum: [standard, silver, gold, platinum]
+        managerId:
+          type: integer
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, artistId, royaltySplitPct, tier, createdAt, updatedAt]
+
+    ArtistProfileBody:
+      type: object
+      properties:
+        royaltySplitPct:
+          type: integer
+        bankDetails:
+          type: object
+          additionalProperties:
+            type: string
+        contractStart:
+          type: string
+        contractEnd:
+          type: string
+        tier:
+          type: string
+          enum: [standard, silver, gold, platinum]
+        managerId:
+          type: integer
+        notes:
+          type: string
+
+    TeamMember:
+      type: object
+      properties:
+        userId:
+          type: integer
+        name:
+          type: string
+        role:
+          type: string
+        targetHourlyRate:
+          type: number
+          nullable: true
+        effectiveRate:
+          type: number
+        dealsClosedMonth:
+          type: integer
+        dealsClosedQuarter:
+          type: integer
+        dealsClosedAllTime:
+          type: integer
+        revenueClosedMonth:
+          type: number
+        revenueClosedAllTime:
+          type: number
+        openDeals:
+          type: integer
+        pipelineValue:
+          type: number
+        hoursThisMonth:
+          type: number
+        winRate:
+          type: integer
+        quotaDealsMonth:
+          type: integer
+          nullable: true
+        quotaRevenueMonth:
+          type: number
+          nullable: true
+        quotaHoursMonth:
+          type: number
+          nullable: true
+        quotaDealsProgress:
+          type: integer
+          nullable: true
+        quotaRevenueProgress:
+          type: integer
+          nullable: true
+        quotaHoursProgress:
+          type: integer
+          nullable: true
+        artistsSigned:
+          type: integer
+        artistsSignedMonth:
+          type: integer
+        projectsBooked:
+          type: integer
+        projectsBookedMonth:
+          type: integer
+        templatesSentMonth:
+          type: integer
+        formSubmissionsMonth:
+          type: integer
+        activityThisWeek:
+          type: integer
+        activityDealsThisWeek:
+          type: integer
+        activityNotesThisWeek:
+          type: integer
+        activityContactsThisWeek:
+          type: integer
+        quotaArtistsMonth:
+          type: integer
+          nullable: true
+        quotaProjectsMonth:
+          type: integer
+          nullable: true
+        quotaArtistsProgress:
+          type: integer
+          nullable: true
+        quotaProjectsProgress:
+          type: integer
+          nullable: true
+      required: [userId, name, role, effectiveRate, dealsClosedMonth, dealsClosedQuarter, dealsClosedAllTime, revenueClosedMonth, revenueClosedAllTime, openDeals, pipelineValue, hoursThisMonth, winRate, artistsSigned, artistsSignedMonth, projectsBooked, projectsBookedMonth, templatesSentMonth, formSubmissionsMonth, activityThisWeek, activityDealsThisWeek, activityNotesThisWeek, activityContactsThisWeek]
+
+    TeamPerformance:
+      type: object
+      properties:
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamMember"
+      required: [members]
+
+    TeamMemberDetail:
+      type: object
+      properties:
+        userId:
+          type: integer
+        name:
+          type: string
+        role:
+          type: string
+        targetHourlyRate:
+          type: number
+          nullable: true
+        effectiveRate:
+          type: number
+        totalDeals:
+          type: integer
+        wonDeals:
+          type: integer
+        totalRevenue:
+          type: number
+        monthlyHours:
+          type: array
+          items:
+            type: object
+            properties:
+              month:
+                type: string
+              hours:
+                type: number
+            required: [month, hours]
+        categoryBreakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              category:
+                type: string
+              hours:
+                type: number
+            required: [category, hours]
+        dealsClosedMonth:
+          type: integer
+        dealsClosedQuarter:
+          type: integer
+        dealsClosedAllTime:
+          type: integer
+        revenueClosedMonth:
+          type: number
+        revenueClosedAllTime:
+          type: number
+        hoursThisMonth:
+          type: number
+        targetHoursMonth:
+          type: number
+          nullable: true
+        winRate:
+          type: integer
+        artistsSignedAllTime:
+          type: integer
+        artistsSignedMonth:
+          type: integer
+        projectsBookedAllTime:
+          type: integer
+        projectsBookedMonth:
+          type: integer
+        templatesSentMonth:
+          type: integer
+        formSubmissionsMonth:
+          type: integer
+        quotaDealsMonth:
+          type: integer
+          nullable: true
+        quotaRevenueMonth:
+          type: number
+          nullable: true
+        quotaHoursMonth:
+          type: number
+          nullable: true
+        quotaArtistsMonth:
+          type: integer
+          nullable: true
+        quotaProjectsMonth:
+          type: integer
+          nullable: true
+        quotaTemplatesMonth:
+          type: integer
+          nullable: true
+        quotaFormsMonth:
+          type: integer
+          nullable: true
+        quotaDealsProgress:
+          type: integer
+          nullable: true
+        quotaRevenueProgress:
+          type: integer
+          nullable: true
+        quotaHoursProgress:
+          type: integer
+          nullable: true
+        quotaArtistsProgress:
+          type: integer
+          nullable: true
+        quotaProjectsProgress:
+          type: integer
+          nullable: true
+        quotaTemplatesProgress:
+          type: integer
+          nullable: true
+        quotaFormsProgress:
+          type: integer
+          nullable: true
+        recentDeals:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              stage:
+                type: string
+              value:
+                type: number
+            required: [id, title, stage, value]
+      required: [userId, name, role, effectiveRate, totalDeals, wonDeals, totalRevenue, monthlyHours, categoryBreakdown, recentDeals, dealsClosedMonth, dealsClosedQuarter, dealsClosedAllTime, revenueClosedMonth, revenueClosedAllTime, hoursThisMonth, winRate, artistsSignedAllTime, artistsSignedMonth, projectsBookedAllTime, projectsBookedMonth, templatesSentMonth, formSubmissionsMonth]
+
+    RoleQuota:
+      type: object
+      properties:
+        id:
+          type: integer
+        role:
+          type: string
+        metricKey:
+          type: string
+        targetValue:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, role, metricKey, targetValue, updatedAt]
+
+    SetUserRateBody:
+      type: object
+      properties:
+        targetHourlyRate:
+          type: number
+          nullable: true
+      required: [targetHourlyRate]
+
+    UserRateResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        targetHourlyRate:
+          type: string
+          nullable: true
+      required: [id, name]
+
+    SetRoleQuotasBody:
+      type: object
+      properties:
+        quotas:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+              metricKey:
+                type: string
+              targetValue:
+                type: number
+            required: [role, metricKey, targetValue]
+      required: [quotas]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    RequestUploadUrlBody:
+      type: object
+      properties:
+        name:
+          type: string
+        size:
+          type: integer
+        contentType:
+          type: string
+      required: [name, size, contentType]
+
+    RequestUploadUrlResponse:
+      type: object
+      properties:
+        uploadURL:
+          type: string
+        objectPath:
+          type: string
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            size:
+              type: integer
+            contentType:
+              type: string
+          required: [name, size, contentType]
+      required: [uploadURL, objectPath, metadata]
+
+    InvoiceEmailTemplate:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        subject:
+          type: string
+        body:
+          type: string
+        createdBy:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, name, subject, body, createdBy, createdAt, updatedAt]
+
+    InvoiceEmailTemplateBody:
+      type: object
+      properties:
+        name:
+          type: string
+        subject:
+          type: string
+        body:
+          type: string
+      required: [name, subject, body]
+
+    # ── DISCOVERY SCHEMAS ──────────────────────────────────────────────────
+    SpotifyArtistResult:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        genres:
+          type: array
+          items:
+            type: string
+        popularity:
+          type: integer
+        followers:
+          type: integer
+        imageUrl:
+          type: string
+          nullable: true
+        profileUrl:
+          type: string
+        externalUrls:
+          type: object
+          additionalProperties:
+            type: string
+        importedArtistId:
+          type: integer
+          nullable: true
+      required: [id, name, genres, popularity, followers, profileUrl, externalUrls, importedArtistId]
+
+    SpotifySearchPage:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpotifyArtistResult"
+        total:
+          type: integer
+        offset:
+          type: integer
+        limit:
+          type: integer
+      required: [results, total, offset, limit]
+
+    YoutubeChannelResult:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        subscriberCount:
+          type: integer
+        videoCount:
+          type: integer
+        thumbnailUrl:
+          type: string
+          nullable: true
+        profileUrl:
+          type: string
+        topicCategories:
+          type: array
+          items:
+            type: string
+        customUrl:
+          type: string
+          nullable: true
+        importedArtistId:
+          type: integer
+          nullable: true
+      required: [id, name, description, subscriberCount, videoCount, profileUrl, topicCategories, importedArtistId]
+
+    YoutubeSearchPage:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/YoutubeChannelResult"
+        nextPageToken:
+          type: string
+          nullable: true
+        totalResults:
+          type: integer
+      required: [results, totalResults]
+
+    DiscoveryImportBody:
+      type: object
+      properties:
+        source:
+          type: string
+          enum: [spotify, youtube, bandcamp, groover]
+        sourceId:
+          type: string
+        name:
+          type: string
+        genres:
+          type: array
+          items:
+            type: string
+        imageUrl:
+          type: string
+          nullable: true
+        profileUrl:
+          type: string
+        bio:
+          type: string
+          nullable: true
+      required: [source, sourceId, name, profileUrl]
+
+    DiscoveryImportResult:
+      type: object
+      properties:
+        artistId:
+          type: integer
+        alreadyExists:
+          type: boolean
+      required: [artistId, alreadyExists]
+
+    ArtistRelationship:
+      type: object
+      properties:
+        id:
+          type: integer
+        fromArtistId:
+          type: integer
+        toEntityId:
+          type: integer
+          nullable: true
+        toEntityType:
+          type: string
+          enum: [artist, producer, engineer, venue, label]
+        toEntityName:
+          type: string
+          nullable: true
+        relationshipType:
+          type: string
+          enum: [collaborator, producer, engineer, venue, label, other]
+        notes:
+          type: string
+          nullable: true
+        createdBy:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, fromArtistId, toEntityType, relationshipType, createdBy, createdAt]
+
+    ArtistRelationshipBody:
+      type: object
+      properties:
+        toEntityId:
+          type: integer
+          nullable: true
+        toEntityType:
+          type: string
+          enum: [artist, producer, engineer, venue, label]
+        toEntityName:
+          type: string
+          nullable: true
+        relationshipType:
+          type: string
+          enum: [collaborator, producer, engineer, venue, label, other]
+        notes:
+          type: string
+          nullable: true
+      required: [relationshipType]
+
+    ArtistGraphData:
+      type: object
+      properties:
+        nodes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+              genre:
+                type: string
+                nullable: true
+              city:
+                type: string
+                nullable: true
+              state:
+                type: string
+                nullable: true
+              labelStatus:
+                type: array
+                items:
+                  type: string
+              outreachStatus:
+                type: string
+            required: [id, name, labelStatus, outreachStatus]
+        links:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              source:
+                type: integer
+              target:
+                type: integer
+              type:
+                type: string
+            required: [id, source, target, type]
+        allRelationships:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtistRelationship"
+      required: [nodes, links, allRelationships]
+
+    CustomLabelStatus:
+      type: object
+      required: [id, key, name, colorClass, createdBy, createdAt]
+      properties:
+        id:
+          type: integer
+        key:
+          type: string
+        name:
+          type: string
+        colorClass:
+          type: string
+        createdBy:
+          type: integer
+        createdAt:
+          type: string
+
+    ArtistTerritoryStats:
+      type: object
+      properties:
+        cities:
+          type: array
+          items:
+            type: object
+            properties:
+              city:
+                type: string
+              state:
+                type: string
+                nullable: true
+              country:
+                type: string
+                nullable: true
+              lat:
+                type: number
+                nullable: true
+              lng:
+                type: number
+                nullable: true
+              count:
+                type: integer
+              labelBreakdown:
+                type: object
+                additionalProperties:
+                  type: integer
+              outreachBreakdown:
+                type: object
+                additionalProperties:
+                  type: integer
+            required: [city, count, labelBreakdown, outreachBreakdown]
+        total:
+          type: integer
+        withCity:
+          type: integer
+        geocoded:
+          type: integer
+      required: [cities, total, withCity, geocoded]
